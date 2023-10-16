@@ -14,16 +14,16 @@ class DZJNICall {
 public:
     JavaVM *javaVM;
     JNIEnv *env;
-    jmethodID jPlayerErrorMid;
-    jmethodID jPlayerPreparedMid;
+    jmethodID jConnectErrorMid;
+    jmethodID jConnectSuccessMid;
     jobject jLiveObj;
 public:
     DZJNICall(JavaVM *javaVm, JNIEnv *env, jobject jLiveObj);
     ~DZJNICall();
 public:
-    void callPlayerError(ThreadMode threadMode,int code, char *msg);
+    void callConnectError(ThreadMode threadMode,int code, char *msg);
 
-    void callPlayerPrepared(ThreadMode mode);
+    void callConnectSuccess(ThreadMode mode);
 };
 
 

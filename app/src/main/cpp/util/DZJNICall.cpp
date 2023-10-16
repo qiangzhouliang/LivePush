@@ -11,25 +11,24 @@ DZJNICall::DZJNICall(JavaVM *javaVm, JNIEnv *env, jobject jLiveObj) {
     this->jLiveObj = env->NewGlobalRef(jLiveObj);
 
 
-//    jclass jPlayerClass = env->FindClass("com/swan/media/SwanPlayer");
+//    jclass jPlayerClass = env->FindClass("com/swan/livepush/LivePush");
     jclass jPlayerClass = env->GetObjectClass(jLiveObj);
-    jPlayerErrorMid = env->GetMethodID(jPlayerClass, "onError", "(ILjava/lang/String;)V");
-    jPlayerPreparedMid = env->GetMethodID(jPlayerClass, "onPrepared", "()V");
+    jConnectErrorMid = env->GetMethodID(jPlayerClass, "onConnectError", "(ILjava/lang/String;)V");
+    jConnectSuccessMid = env->GetMethodID(jPlayerClass, "onConnectSuccess", "()V");
     LOGE("------------>");
 }
-
 
 
 DZJNICall::~DZJNICall() {
     env->DeleteGlobalRef(jLiveObj);
 }
 
-void DZJNICall::callPlayerError(ThreadMode threadMode,int code, char *msg) {
+void DZJNICall::callConnectError(ThreadMode threadMode,int code, char *msg) {
     // 子线程用不了主线程 jniEnv （native 线程）
     // 子线程是不共享 jniEnv ，他们有自己所独有的
     if (threadMode == THREAD_MAIN) {
         jstring jMsg = env->NewStringUTF(msg);
-        env->CallVoidMethod(jLiveObj, jPlayerErrorMid, code, jMsg);
+        env->CallVoidMethod(jLiveObj, jConnectErrorMid, code, jMsg);
         env->DeleteLocalRef(jMsg);
     } else if (threadMode == THREAD_CHILD) {
         // 获取当前线程的 JNIEnv， 通过 JavaVM
@@ -40,7 +39,7 @@ void DZJNICall::callPlayerError(ThreadMode threadMode,int code, char *msg) {
         }
 
         jstring jMsg = env->NewStringUTF(msg);
-        env->CallVoidMethod(jLiveObj, jPlayerErrorMid, code, jMsg);
+        env->CallVoidMethod(jLiveObj, jConnectErrorMid, code, jMsg);
         env->DeleteLocalRef(jMsg);
 
         javaVM->DetachCurrentThread();
@@ -50,11 +49,11 @@ void DZJNICall::callPlayerError(ThreadMode threadMode,int code, char *msg) {
  * 回调到java层，告诉他准备好了
  * @param mode
  */
-void DZJNICall::callPlayerPrepared(ThreadMode threadMode) {
+void DZJNICall::callConnectSuccess(ThreadMode threadMode) {
 // 子线程用不了主线程 jniEnv （native 线程）
     // 子线程是不共享 jniEnv ，他们有自己所独有的
     if (threadMode == THREAD_MAIN) {
-        env->CallVoidMethod(jLiveObj, jPlayerPreparedMid);
+        env->CallVoidMethod(jLiveObj, jConnectSuccessMid);
     } else if (threadMode == THREAD_CHILD) {
         // 获取当前线程的 JNIEnv， 通过 JavaVM
         JNIEnv *env;
@@ -63,7 +62,7 @@ void DZJNICall::callPlayerPrepared(ThreadMode threadMode) {
             return;
         }
 
-        env->CallVoidMethod(jLiveObj, jPlayerPreparedMid);
+        env->CallVoidMethod(jLiveObj, jConnectSuccessMid);
         javaVM->DetachCurrentThread();
     }
 }

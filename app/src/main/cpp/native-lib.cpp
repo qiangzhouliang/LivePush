@@ -26,6 +26,7 @@ Java_com_swan_livepush_LivePush_nInitConnect(JNIEnv *env, jobject thiz, jstring 
     pJniCall = new DZJNICall(pJavaVm, env, thiz);
     pLivePush = new DZLivePush(mLiveUrl, pJniCall);
 
+    pLivePush->initConnect();
 
 
     env->ReleaseStringUTFChars(mLiveUrl_, mLiveUrl);
