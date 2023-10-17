@@ -1,10 +1,5 @@
-//
-// Created by swan on 2023/10/16.
-//
-
 #ifndef LIVEPUSH_DZLIVEPUSH_H
 #define LIVEPUSH_DZLIVEPUSH_H
-
 
 #include "DZJNICall.h"
 #include "DZPacketQueue.h"

@@ -28,6 +28,18 @@ Java_com_swan_livepush_LivePush_nInitConnect(JNIEnv *env, jobject thiz, jstring 
 
     pLivePush->initConnect();
 
-
     env->ReleaseStringUTFChars(mLiveUrl_, mLiveUrl);
+}
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_swan_livepush_LivePush_nStop(JNIEnv *env, jobject thiz) {
+    if (pLivePush != NULL){
+        delete(pLivePush);
+        pLivePush = NULL;
+    }
+
+    if (pJniCall != NULL){
+        delete(pJniCall);
+        pJniCall = NULL;
+    }
 }

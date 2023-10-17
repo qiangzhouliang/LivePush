@@ -11,6 +11,13 @@ DZLivePush::DZLivePush(const char *liveUrl,DZJNICall *pJniCall) :pJniCall(pJniCa
 }
 
 DZLivePush::~DZLivePush() {
+    if (pRtmp != NULL){
+        // 断开连接
+        RTMP_Close(pRtmp);
+        free(pRtmp);
+        pRtmp = NULL;
+    }
+
     if (liveUrl != NULL){
         free(liveUrl);
         liveUrl = NULL;

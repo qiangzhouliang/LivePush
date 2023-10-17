@@ -1,5 +1,8 @@
 package com.swan.livepush;
 
+import android.os.Handler;
+import android.os.Looper;
+
 /**
  * @ClassName LivePush
  * @Description
@@ -11,6 +14,10 @@ public class LivePush {
         System.loadLibrary("livepush");
     }
 
+    /**
+     * 主线程 handle
+     */
+    private static Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
     private String mLiveUrl;
     private ConnectListener mConnectListener;
     public LivePush(String liveUrl){
@@ -30,10 +37,20 @@ public class LivePush {
     // 连接的回调
     // call from jni
     public void onConnectError(int errCode, String errMsg){
+        stop();
         if (this.mConnectListener != null){
             this.mConnectListener.connectError(errCode, errMsg);
         }
     }
+
+    public void stop() {
+        MAIN_HANDLER.post(() -> {
+            nStop();
+        });
+    }
+
+    private native void nStop();
+
     // call from jni
     public void onConnectSuccess(){
         if (this.mConnectListener != null){

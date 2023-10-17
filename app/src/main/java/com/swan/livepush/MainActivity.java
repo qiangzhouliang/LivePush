@@ -21,9 +21,15 @@ public class MainActivity extends AppCompatActivity implements ConnectListener {
         setContentView(binding.getRoot());
 
         mLivePush = new LivePush("rtmp://120.24.85.248/myapp/mystream");
-        mLivePush.initConnect();
         mLivePush.setOnConnectListener(this);
+        mLivePush.initConnect();
 
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mLivePush.stop();
     }
 
     @Override
