@@ -1,5 +1,5 @@
 package com.swan.record.intf;
 
-public interface RecordInfoListener {
+public interface RecordListener {
     void onTime(long times);
 }

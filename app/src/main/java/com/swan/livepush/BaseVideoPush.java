@@ -1,16 +1,13 @@
-package com.swan.record;
+package com.swan.livepush;
 
 import android.content.Context;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
-import android.media.MediaMuxer;
 import android.opengl.GLSurfaceView;
+import android.util.Log;
 import android.view.Surface;
 
-import com.darren.media.DarrenPlayer;
-import com.darren.media.listener.MediaInfoListener;
-import com.darren.media.listener.MediaPreparedListener;
 import com.swan.opengl.EglHelper;
 import com.swan.record.intf.RecordListener;
 
@@ -26,9 +23,9 @@ import javax.microedition.khronos.opengles.GL10;
  * Created by hcDarren on 2019/7/13.
  */
 
-public abstract class BaseVideoRecorder {
+public abstract class BaseVideoPush {
 
-    private WeakReference<BaseVideoRecorder> mVideoRecorderWr = new WeakReference<>(this);
+    private WeakReference<BaseVideoPush> mVideoRecorderWr = new WeakReference<>(this);
     /**
      * 硬编码 MediaCodec 的 surface
      */
@@ -41,7 +38,6 @@ public abstract class BaseVideoRecorder {
 
     private GLSurfaceView.Renderer mRenderer;
 
-    private MediaMuxer mMediaMuxer;
     private VideoRenderThread mRenderThread;
     private VideoEncoderThread mVideoThread;
     private AudioEncoderThread mAudioThread;
@@ -51,68 +47,15 @@ public abstract class BaseVideoRecorder {
     private CyclicBarrier mStartCb = new CyclicBarrier(2);
     private CyclicBarrier mDestroyCb = new CyclicBarrier(2);
 
-    private DarrenPlayer mMusicPlayer;
-
     public void setRenderer(GLSurfaceView.Renderer renderer) {
         this.mRenderer = renderer;
         mRenderThread = new VideoRenderThread(mVideoRecorderWr);
     }
 
-    public BaseVideoRecorder(Context context, EGLContext eglContext) {
+    public BaseVideoPush(Context context, EGLContext eglContext) {
         this.mContext = context;
         this.mEglContext = eglContext;
-        mMusicPlayer = new DarrenPlayer();
-
-        mMusicPlayer.setOnPreparedListener(new MediaPreparedListener() {
-            @Override
-            public void onPrepared() {
-                mMusicPlayer.play();
-                start();
-            }
-        });
-
-        mMusicPlayer.setOnInfoListener(mMediaInfoListener);
     }
-
-    private void start() {
-        mRenderThread.start();
-        mVideoThread.start();
-        mAudioThread.start();
-    }
-
-    private MediaInfoListener mMediaInfoListener = new MediaInfoListener() {
-        private long mAudioPts = 0;
-        private int mSampleRate = 0;
-        private int mChannels = 0;
-
-        @Override
-        public void musicInfo(int sampleRate, int channels) {
-            // 获取了音频的信息
-            try {
-                initAudioCodec(sampleRate, channels);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            this.mSampleRate = sampleRate;
-            this.mChannels = channels;
-        }
-
-        @Override
-        public void callbackPcm(byte[] pcmData, int size) {
-            // 把数据写入到 mAudioCodec 的 InputBuffer
-            int inputBufferIndex = mAudioCodec.dequeueInputBuffer(0);
-            if (inputBufferIndex >= 0) {
-                ByteBuffer byteBuffer = mAudioCodec.getInputBuffers()[inputBufferIndex];
-                byteBuffer.clear();
-                byteBuffer.put(pcmData);
-
-                // pts  44100 * 2 *2
-                mAudioPts += size * 1000000 / mSampleRate * mChannels * 2;
-                // size 22050*2*2
-                mAudioCodec.queueInputBuffer(inputBufferIndex, 0, size, mAudioPts, 0);
-            }
-        }
-    };
 
     private void initAudioCodec(int sampleRate, int channels) throws IOException {
         MediaFormat audioFormat = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, sampleRate, channels);
@@ -131,31 +74,28 @@ public abstract class BaseVideoRecorder {
     /**
      * 初始化参数
      *
-     * @param audioPath   背景音乐的地址
-     * @param outPath     输出文件的路径
      * @param videoWidth  录制的宽度
      * @param videoHeight 录制的高度
      */
-    public void initVideo(String audioPath, String outPath, int videoWidth, int videoHeight) {
+    public void initVideo(int videoWidth, int videoHeight) {
         try {
             mRenderThread.setSize(videoWidth, videoHeight);
-            mMediaMuxer = new MediaMuxer(outPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
             initVideoCodec(videoWidth, videoHeight);
-            mMusicPlayer.setDataSource(audioPath);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public void startRecord() {
-        mMusicPlayer.prepareAsync();
+    public void startPush() {
+        mRenderThread.start();
+        mVideoThread.start();
+        // mAudioThread.start();
     }
 
-    public void stopRecord() {
-        mMusicPlayer.stop();
+    public void stopPush() {
         mRenderThread.requestExit();
         mVideoThread.requestExit();
-        mAudioThread.requestExit();
+        // mAudioThread.requestExit();
     }
 
     /**
@@ -187,19 +127,17 @@ public abstract class BaseVideoRecorder {
      * 视频的编码线程
      */
     private static final class VideoEncoderThread extends Thread {
-        private final MediaMuxer mMediaMuxer;
-        private WeakReference<BaseVideoRecorder> mVideoRecorderWr;
+        private WeakReference<BaseVideoPush> mVideoRecorderWr;
         private volatile boolean mShouldExit = false;
         private MediaCodec mVideoCodec;
         private MediaCodec.BufferInfo mBufferInfo;
-        private int mVideoTrackIndex = -1;
         private long mVideoPts = 0;
         private final CyclicBarrier mStartCb, mDestroyCb;
+        private byte[] mVideoSps,mVideoPps;
 
-        public VideoEncoderThread(WeakReference<BaseVideoRecorder> videoRecorderWr) {
+        public VideoEncoderThread(WeakReference<BaseVideoPush> videoRecorderWr) {
             this.mVideoRecorderWr = videoRecorderWr;
             mVideoCodec = videoRecorderWr.get().mVideoCodec;
-            mMediaMuxer = videoRecorderWr.get().mMediaMuxer;
             mBufferInfo = new MediaCodec.BufferInfo();
             mStartCb = videoRecorderWr.get().mStartCb;
             mDestroyCb = videoRecorderWr.get().mDestroyCb;
@@ -209,11 +147,13 @@ public abstract class BaseVideoRecorder {
         public void run() {
             try {
                 mVideoCodec.start();
+
                 while (true) {
                     if (mShouldExit) {
                         return;
                     }
-                    BaseVideoRecorder videoRecorder = mVideoRecorderWr.get();
+
+                    BaseVideoPush videoRecorder = mVideoRecorderWr.get();
                     if (videoRecorder == null) {
                         return;
                     }
@@ -221,9 +161,21 @@ public abstract class BaseVideoRecorder {
                     // 代码先不写，先测试，从 surface 上获取数据，编码成 h264 ,通过 MediaMuxer 合成 mp4
                     int outputBufferIndex = mVideoCodec.dequeueOutputBuffer(mBufferInfo, 0);
                     if (outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                        mVideoTrackIndex = mMediaMuxer.addTrack(mVideoCodec.getOutputFormat());
-                        mMediaMuxer.start();
-                        mStartCb.await();
+                        // mStartCb.await();
+
+                        // 获取 sps 和 pps
+                        Log.e("TAG", "获取 sps 和 pps");
+                        ByteBuffer byteBuffer = mVideoCodec.getOutputFormat().getByteBuffer("csd-0");
+                        mVideoSps = new byte[byteBuffer.remaining()];
+                        byteBuffer.get(mVideoSps, 0, mVideoSps.length);
+
+                        Log.e("sps", bytesToHexString(mVideoSps));
+
+                        byteBuffer = mVideoCodec.getOutputFormat().getByteBuffer("csd-1");
+                        mVideoPps = new byte[byteBuffer.remaining()];
+                        byteBuffer.get(mVideoPps, 0, mVideoPps.length);
+
+                        Log.e("pps", bytesToHexString(mVideoPps));
                     } else {
                         while (outputBufferIndex >= 0) {
                             // 获取数据
@@ -237,8 +189,9 @@ public abstract class BaseVideoRecorder {
                             }
                             mBufferInfo.presentationTimeUs -= mVideoPts;
 
-                            // 写入数据
-                            mMediaMuxer.writeSampleData(mVideoTrackIndex, outBuffer, mBufferInfo);
+                            byte[] data = new byte[outBuffer.remaining()];
+                            outBuffer.get(data, 0, data.length);
+                            Log.e("TAG",bytesToHexString(data));
 
                             // 回调当前录制的时间
                             if (videoRecorder.mRecordListener != null) {
@@ -261,9 +214,7 @@ public abstract class BaseVideoRecorder {
             try {
                 mVideoCodec.stop();
                 mVideoCodec.release();
-                mDestroyCb.await();
-                mMediaMuxer.stop();
-                mMediaMuxer.release();
+                // mDestroyCb.await();
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -275,11 +226,10 @@ public abstract class BaseVideoRecorder {
     }
 
     /**
-     * 音频的编码线程
+     * 视频的编码线程
      */
     private static final class AudioEncoderThread extends Thread {
-        private final MediaMuxer mMediaMuxer;
-        private WeakReference<BaseVideoRecorder> mVideoRecorderWr;
+        private WeakReference<BaseVideoPush> mVideoRecorderWr;
         private volatile boolean mShouldExit = false;
         private MediaCodec mAudioCodec;
         private MediaCodec.BufferInfo mBufferInfo;
@@ -287,10 +237,9 @@ public abstract class BaseVideoRecorder {
         private long mAudioPts = 0;
         private final CyclicBarrier mStartCb, mDestroyCb;
 
-        public AudioEncoderThread(WeakReference<BaseVideoRecorder> videoRecorderWr) {
+        public AudioEncoderThread(WeakReference<BaseVideoPush> videoRecorderWr) {
             this.mVideoRecorderWr = videoRecorderWr;
             mAudioCodec = videoRecorderWr.get().mAudioCodec;
-            mMediaMuxer = videoRecorderWr.get().mMediaMuxer;
             mBufferInfo = new MediaCodec.BufferInfo();
             mStartCb = videoRecorderWr.get().mStartCb;
             mDestroyCb = videoRecorderWr.get().mDestroyCb;
@@ -304,7 +253,7 @@ public abstract class BaseVideoRecorder {
                         return;
                     }
 
-                    BaseVideoRecorder videoRecorder = mVideoRecorderWr.get();
+                    BaseVideoPush videoRecorder = mVideoRecorderWr.get();
                     if (videoRecorder == null) {
                         return;
                     }
@@ -312,9 +261,7 @@ public abstract class BaseVideoRecorder {
                     // 获取音频数据，那这个音频数据从哪里来？音乐播放器里面来，pcm 数据
                     int outputBufferIndex = mAudioCodec.dequeueOutputBuffer(mBufferInfo, 0);
                     if (outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                        mAudioTrackIndex = mMediaMuxer.addTrack(mAudioCodec.getOutputFormat());
-                        mStartCb.await();
-                        // mMediaMuxer.start();
+                        // mStartCb.await();
                     } else {
                         while (outputBufferIndex >= 0) {
                             // 获取数据
@@ -327,9 +274,6 @@ public abstract class BaseVideoRecorder {
                                 mAudioPts = mBufferInfo.presentationTimeUs;
                             }
                             mBufferInfo.presentationTimeUs -= mAudioPts;
-
-                            // 写入数据
-                            mMediaMuxer.writeSampleData(mAudioTrackIndex, outBuffer, mBufferInfo);
 
                             mAudioCodec.releaseOutputBuffer(outputBufferIndex, false);
                             outputBufferIndex = mAudioCodec.dequeueOutputBuffer(mBufferInfo, 0);
@@ -368,7 +312,7 @@ public abstract class BaseVideoRecorder {
      * 视频的渲染线程
      */
     private static final class VideoRenderThread extends Thread {
-        private WeakReference<BaseVideoRecorder> mVideoRecorderWr;
+        private WeakReference<BaseVideoPush> mVideoRecorderWr;
         private volatile boolean mShouldExit = false;
         private EglHelper mEglHelper;
         private boolean mHashCreateContext = false;
@@ -377,7 +321,7 @@ public abstract class BaseVideoRecorder {
         private int mWidth;
         private int mHeight;
 
-        public VideoRenderThread(WeakReference<BaseVideoRecorder> videoRecorderWr) {
+        public VideoRenderThread(WeakReference<BaseVideoPush> videoRecorderWr) {
             this.mVideoRecorderWr = videoRecorderWr;
             mEglHelper = new EglHelper();
         }
@@ -391,7 +335,7 @@ public abstract class BaseVideoRecorder {
                         return;
                     }
 
-                    BaseVideoRecorder videoRecorder = mVideoRecorderWr.get();
+                    BaseVideoPush videoRecorder = mVideoRecorderWr.get();
                     if (videoRecorder == null) {
                         return;
                     }
@@ -440,5 +384,19 @@ public abstract class BaseVideoRecorder {
             this.mWidth = width;
             this.mHeight = height;
         }
+    }
+
+    private static String bytesToHexString(byte[] bArr) {
+        StringBuffer sb = new StringBuffer(bArr.length);
+        String sTmp;
+
+        for (int i = 0; i < bArr.length; i++) {
+            sTmp = Integer.toHexString(bArr[i]);
+            if (sTmp.length() < 2) {
+                sb.append(0);
+            }
+            sb.append(sTmp.toUpperCase());
+        }
+        return sb.toString();
     }
 }
