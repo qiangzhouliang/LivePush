@@ -14,6 +14,7 @@ public:
     DZPacketQueue *pPacketQueue = NULL;
     RTMP *pRtmp = NULL;
     bool isPushing = true;
+    uint32_t startTime;
 
 public:
     DZLivePush(const char *liveUrl, DZJNICall *pJniCall);
@@ -27,6 +28,7 @@ public:
 
     void pushSpsPps(jbyte *spsData, jint spsLen, jbyte *ppsData, jint ppsLen);
 
+    void pushVideo(jbyte *videoData, jint dataLen, jboolean keyFrame);
 };
 
 

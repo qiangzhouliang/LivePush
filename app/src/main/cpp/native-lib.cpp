@@ -56,3 +56,14 @@ Java_com_swan_livepush_LivePush_pushSpsPps(JNIEnv *env, jobject thiz, jbyteArray
     env->ReleaseByteArrayElements(sps_data, spsData, 0);
     env->ReleaseByteArrayElements(pps_data, ppsData, 0);
 }
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_swan_livepush_LivePush_pushVideo(JNIEnv *env, jobject thiz, jbyteArray video_data,
+                                          jint data_len, jboolean key_frame) {
+    jbyte *videoData = env->GetByteArrayElements(video_data, NULL);
+    if (pLivePush != NULL){
+        pLivePush->pushVideo(videoData, data_len, key_frame);
+    }
+
+    env->ReleaseByteArrayElements(video_data, videoData, 0);
+}

@@ -59,4 +59,6 @@ public class LivePush {
     }
 
     public native void pushSpsPps(byte[] spsData, int spsLen, byte[] ppsData, int ppsLen);
+
+    public native void pushVideo(byte[] videoData, int dataLen, boolean keyFrame);
 }

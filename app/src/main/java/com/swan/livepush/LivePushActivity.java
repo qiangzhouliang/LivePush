@@ -9,7 +9,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.swan.camera.widget.CameraFocusView;
 import com.swan.camera.widget.CameraView;
 import com.swan.livepush.databinding.ActivityMainBinding;
-import com.swan.opengl.Utils;
 
 public class LivePushActivity extends AppCompatActivity implements ConnectListener {
 
@@ -50,8 +49,12 @@ public class LivePushActivity extends AppCompatActivity implements ConnectListen
         Log.e("TAG","开始推流");
         mVideoPush = new DefaultVideoPush(LivePushActivity.this,
             mCameraView.getEglContext(), mCameraView.getTextureId());
-        mVideoPush.initVideo("rtmp://120.24.85.248/myapp/mystream",LivePushActivity.this,Utils.getScreenWidth(LivePushActivity.this),
-            Utils.getScreenHeight(LivePushActivity.this));
+        //mVideoPush.initVideo("rtmp://120.24.85.248/myapp/mystream",LivePushActivity.this,Utils.getScreenWidth(LivePushActivity.this),
+        //    Utils.getScreenHeight(LivePushActivity.this));
+
+        mVideoPush.initVideo("rtmp://120.24.85.248/myapp/mystream",LivePushActivity.this,
+            720/2,
+            1280/2);
         mVideoPush.setOnConnectListener(this);
         mVideoPush.startPush();
     }

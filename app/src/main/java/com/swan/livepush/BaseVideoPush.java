@@ -223,9 +223,12 @@ public abstract class BaseVideoPush {
                                 mVideoRecorderWr.get().mLivePush.pushSpsPps(mVideoSps,mVideoSps.length, mVideoPps, mVideoPps.length);
                             }
 
-                            /*byte[] data = new byte[outBuffer.remaining()];
+                            byte[] data = new byte[outBuffer.remaining()];
                             outBuffer.get(data, 0, data.length);
-                            Log.e("TAG", bytesToHexString(data));*/
+                            //Log.e("TAG", bytesToHexString(data));
+                            // 推送每一帧
+                            mVideoRecorderWr.get().mLivePush.pushVideo(data, data.length,mBufferInfo.flags == MediaCodec.BUFFER_FLAG_KEY_FRAME);
+
 
                             // 回调当前录制的时间
                             if (videoRecorder.mRecordListener != null) {

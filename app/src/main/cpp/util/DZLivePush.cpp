@@ -56,6 +56,7 @@ void *initConnectFun(void * context){
 
     LOGE("rtmp connect success");
     pLivePush->pJniCall->callConnectSuccess(THREAD_CHILD);
+    pLivePush->startTime = RTMP_GetTime();
     // 推流
     while (pLivePush->isPushing){
         // 不断往流媒体服务器上去推
@@ -155,5 +156,60 @@ void DZLivePush::pushSpsPps(jbyte *spsData, jint spsLen, jbyte *ppsData, jint pp
     pPacket->m_headerType = RTMP_PACKET_SIZE_MEDIUM;
     pPacket->m_nInfoField2 = this->pRtmp->m_stream_id;
     // 添加到发送队列
+    pPacketQueue->push(pPacket);
+}
+/**
+ * 发送每一帧的视频数据到服务器
+ * @param videoData
+ * @param dataLen
+ * @param keyFrame
+ */
+void DZLivePush::pushVideo(jbyte *videoData, jint dataLen, jboolean keyFrame) {
+    // frame type : 1关键帧，2 非关键帧 (4bit)
+    // CodecID : 7表示 AVC (4bit)  , 与 frame type 组合起来刚好是 1 个字节  0x17
+    // fixed : 0x01 0x00 0x00 0x00 (4byte)  0x01  表示 NALU 单元
+
+    // video data length       (4byte)  video 长度
+    // video data
+
+    // body 长度 = dataLen + 上面所罗列出来的 9 字节
+    int bodySize = dataLen + 9;
+    // 初始化创建 RTMPPacket
+    RTMPPacket *pPacket = static_cast<RTMPPacket *>(malloc(sizeof(RTMPPacket)));
+    RTMPPacket_Alloc(pPacket, bodySize);
+    RTMPPacket_Reset(pPacket);
+
+    // 按照上面的协议，开始一个一个给 body 赋值
+    char *body = pPacket->m_body;
+    int index = 0;
+
+    // CodecID 与 frame type 组合起来刚好是 1 个字节  0x17
+    if (keyFrame) {
+        body[index++] = 0x17;
+    } else {
+        body[index++] = 0x27;
+    }
+    // fixed : 0x01 0x00 0x00 0x00 (4byte)  0x01  表示 NALU 单元
+    body[index++] = 0x01;
+    body[index++] = 0x00;
+    body[index++] = 0x00;
+    body[index++] = 0x00;
+
+    // (4byte)  video 长度
+    body[index++] = (dataLen >> 24) & 0xff;
+    body[index++] = (dataLen >> 16) & 0xff;
+    body[index++] = (dataLen >> 8) & 0xff;
+    body[index++] = dataLen & 0xff;
+    // video data
+    memcpy(&body[index], videoData, dataLen);
+
+    // 设置 RTMPPacket 的参数
+    pPacket->m_packetType = RTMP_PACKET_TYPE_VIDEO;
+    pPacket->m_nBodySize = bodySize;
+    pPacket->m_nTimeStamp = RTMP_GetTime() - startTime;
+    pPacket->m_hasAbsTimestamp = 0;
+    pPacket->m_nChannel = 0x04;
+    pPacket->m_headerType = RTMP_PACKET_SIZE_LARGE;
+    pPacket->m_nInfoField2 = this->pRtmp->m_stream_id;
     pPacketQueue->push(pPacket);
 }
