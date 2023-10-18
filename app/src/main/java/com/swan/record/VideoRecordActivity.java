@@ -58,7 +58,7 @@ public class VideoRecordActivity extends AppCompatActivity {
                     getApplication().getFilesDir().getPath() + "/live_pusher.mp4",
                     720, 1280);
                 mVideoRecorder.startRecord();
-                mVideoRecorder.setOnRecordInfoListener(times ->{
+                mVideoRecorder.setOnRecordListener(times ->{
                     mRecordButton.setCurrentProgress((int)times);
                     Log.e("TAG", "录制了： "+times);
                 });
