@@ -203,7 +203,8 @@ public class RecordProgressButton extends View {
     private void onEnd() {
         mCurrentProgress = 0;
         mIsRecording = false;
-        fingerUpAnim();
+        // 切换到主线程运行
+        post(() -> fingerUpAnim());
         if (mRecordListener != null) {
             mRecordListener.onEnd();
         }
