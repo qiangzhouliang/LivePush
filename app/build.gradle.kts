@@ -14,6 +14,16 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        externalNativeBuild {
+            cmake {
+                cppFlags("")
+                abiFilters("armeabi-v7a")// 只编译armeabi
+            }
+        }
+        ndk {
+            abiFilters.add("armeabi-v7a")
+        }
+
     }
 
     buildTypes {

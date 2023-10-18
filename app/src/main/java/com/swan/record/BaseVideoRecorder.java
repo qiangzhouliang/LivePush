@@ -10,11 +10,15 @@ import android.opengl.GLSurfaceView;
 import android.util.Log;
 import android.view.Surface;
 
+import com.darren.media.DarrenPlayer;
+import com.darren.media.listener.MediaInfoListener;
 import com.swan.opengl.EglHelper;
+import com.swan.record.intf.RecordInfoListener;
 
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
+import java.util.concurrent.CyclicBarrier;
 
 import javax.microedition.khronos.egl.EGLContext;
 import javax.microedition.khronos.opengles.GL10;
@@ -40,8 +44,22 @@ public abstract class BaseVideoRecorder {
     private VideoRenderThread mRenderThread;
     private VideoEncoderThread mVideoThread;
 
+    private AudioEncoderThread mAudioThread;
+
     private Context mContext;
     private MediaCodec mVideoCodec;
+    private MediaCodec mAudioCodec;
+    private CyclicBarrier mStartCb = new CyclicBarrier(2);
+    private CyclicBarrier mDestroyCb = new CyclicBarrier(2);
+
+    // 创建一个播放器
+    private DarrenPlayer mMusicPlayer;
+
+    private RecordInfoListener mRecordInfoListener;
+
+    public void setOnRecordInfoListener(RecordInfoListener mRecordInfoListener) {
+        this.mRecordInfoListener = mRecordInfoListener;
+    }
 
     public void setRenderer(GLSurfaceView.Renderer renderer) {
         this.mRenderer = renderer;
@@ -51,6 +69,43 @@ public abstract class BaseVideoRecorder {
     public BaseVideoRecorder(Context context, EGLContext eglContext){
         this.mEglContext = eglContext;
         this.mContext = context;
+        mMusicPlayer = new DarrenPlayer();
+        mMusicPlayer.setOnPreparedListener(() -> mMusicPlayer.play());
+        mMusicPlayer.setOnInfoListener(mediaInfoListener);
+    }
+
+    private MediaInfoListener mediaInfoListener = new MediaInfoListener() {
+        @Override
+        public void musicInfo(int sampleRate, int channels) {
+            // 获取了 音频信息
+            try {
+                initAudioCodec(sampleRate, channels);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        @Override
+        public void callbackPcm(byte[] pcmData, int size) {
+
+        }
+    };
+
+    private void initAudioCodec(int sampleRate, int channels) throws IOException {
+        MediaFormat audioFormat = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, sampleRate, channels);
+        audioFormat.setInteger(MediaFormat.KEY_BIT_RATE, 96000);
+        // 设置帧率
+        audioFormat.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
+        // 设置缓存区
+        audioFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, sampleRate * channels * 2);
+        // 创建音频编码器
+        mAudioCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC);
+        mAudioCodec.configure(audioFormat, null,null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+        //相机的像素数据绘制到该 surface 上面
+        mSurface = mVideoCodec.createInputSurface();
+
+        // 开启一个编码采集 音乐播放器回调的 pcm 数据，合成视频
+        mAudioThread = new AudioEncoderThread(mVideoRecorderWr);
     }
 
     /**
@@ -67,6 +122,7 @@ public abstract class BaseVideoRecorder {
             mMediaMuxer = new MediaMuxer(outPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
 
             initVideoCodec(videoWidth, videoHeight);
+            mMusicPlayer.setDataSource(audioPath);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -75,6 +131,7 @@ public abstract class BaseVideoRecorder {
     public void startRecord() {
         mRenderThread.start();
         mVideoThread.start();
+        mMusicPlayer.prepareAsync();
         // mAudioEncoderThread.start();
         Log.e("TAG", "startRecord:");
     }
@@ -82,6 +139,7 @@ public abstract class BaseVideoRecorder {
     public void stopRecord() {
         mRenderThread.requestExit();
         mVideoThread.requestExit();
+        mMusicPlayer.stop();
         // mAudioEncoderThread.requestExit();
         Log.e("TAG", "stopRecord:");
     }
@@ -201,6 +259,8 @@ public abstract class BaseVideoRecorder {
         private MediaCodec mVideoCodec;
         private MediaCodec.BufferInfo mBufferInfo;
         private MediaMuxer mMediaMuxer;
+        // 两个线程的一段代码都执行完后，继续往下执行
+        private final CyclicBarrier mStartCb,mDestroyCb;
         /**
          * 视频轨道
          */
@@ -213,6 +273,8 @@ public abstract class BaseVideoRecorder {
             mVideoCodec = videoRecorderWr.get().mVideoCodec;
             mBufferInfo = new MediaCodec.BufferInfo();
             mMediaMuxer = videoRecorderWr.get().mMediaMuxer;
+            mStartCb = videoRecorderWr.get().mStartCb;
+            mDestroyCb = videoRecorderWr.get().mDestroyCb;
         }
 
         @Override
@@ -236,6 +298,7 @@ public abstract class BaseVideoRecorder {
                     if (outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                         mVideoTrackIndex = mMediaMuxer.addTrack(mVideoCodec.getOutputFormat());
                         mMediaMuxer.start();
+                        mStartCb.wait();
                     } else {
                         while (outputBufferIndex >= 0) {
                             // 获取数据
@@ -274,6 +337,7 @@ public abstract class BaseVideoRecorder {
             try {
                 mVideoCodec.stop();
                 mVideoCodec.release();
+                mDestroyCb.wait();
                 mMediaMuxer.stop();
                 mMediaMuxer.release();
             } catch (Exception e) {
@@ -286,15 +350,105 @@ public abstract class BaseVideoRecorder {
         }
     }
 
+    /**
+     * 编码音频线程
+     */
+    public static final class AudioEncoderThread extends Thread {
+        private WeakReference<BaseVideoRecorder> mVideoRecorderWr;
+        private volatile boolean mShouldExit;
 
+        private MediaCodec mAudioCodec;
+        private MediaCodec.BufferInfo mBufferInfo;
+        private MediaMuxer mMediaMuxer;
+        private final CyclicBarrier mStartCb,mDestroyCb;
+        /**
+         * 视频轨道
+         */
+        private int mVideoTrackIndex = -1;
 
-    private RecordInfoListener mRecordInfoListener;
+        private long mVideoPts = 0;
 
-    public void setOnRecordInfoListener(RecordInfoListener mRecordInfoListener) {
-        this.mRecordInfoListener = mRecordInfoListener;
+        public AudioEncoderThread(WeakReference<BaseVideoRecorder> videoRecorderWr) {
+            this.mVideoRecorderWr = videoRecorderWr;
+            mAudioCodec = videoRecorderWr.get().mAudioCodec;
+            mBufferInfo = new MediaCodec.BufferInfo();
+            mMediaMuxer = videoRecorderWr.get().mMediaMuxer;
+            mStartCb = videoRecorderWr.get().mStartCb;
+            mDestroyCb = videoRecorderWr.get().mDestroyCb;
+        }
+
+        @Override
+        public void run() {
+            mShouldExit = false;
+            mAudioCodec.start();
+
+            try {
+                while (true) {
+                    if (mShouldExit) {
+                        onDestroy();
+                        return;
+                    }
+                    if (mAudioCodec == null){
+                        return;
+                    }
+
+                    // 获取音频数据，音频数据从哪里来？从音乐播放器来，pcm数据
+                    int outputBufferIndex = mAudioCodec.dequeueOutputBuffer(mBufferInfo, 0);
+
+                    if (outputBufferIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                        mVideoTrackIndex = mMediaMuxer.addTrack(mAudioCodec.getOutputFormat());
+                        mStartCb.wait();
+                        //mMediaMuxer.start();
+                    } else {
+                        while (outputBufferIndex >= 0) {
+                            // 获取数据
+                            ByteBuffer outBuffer = mAudioCodec.getOutputBuffers()[outputBufferIndex];
+                            outBuffer.position(mBufferInfo.offset);
+                            outBuffer.limit(mBufferInfo.offset + mBufferInfo.size);
+
+                            // 修改视频的 pts
+                            if (mVideoPts == 0) {
+                                mVideoPts = mBufferInfo.presentationTimeUs;
+                            }
+                            mBufferInfo.presentationTimeUs -= mVideoPts;
+
+                            // 这里要等待，视频渲染开启 mMediaMuxer
+                            // 写入数据
+                            mMediaMuxer.writeSampleData(mVideoTrackIndex, outBuffer, mBufferInfo);
+
+                            // 回调当前录制时间
+                            if (mVideoRecorderWr.get().mRecordInfoListener != null) {
+                                mVideoRecorderWr.get().mRecordInfoListener.onTime(mBufferInfo.presentationTimeUs / 1000);
+                            }
+
+                            // 释放 OutputBuffer
+                            mAudioCodec.releaseOutputBuffer(outputBufferIndex, false);
+                            outputBufferIndex = mAudioCodec.dequeueOutputBuffer(mBufferInfo, 0);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                onDestroy();
+            }
+        }
+
+        private void onDestroy() {
+            try {
+                mAudioCodec.stop();
+                mAudioCodec.release();
+                mDestroyCb.wait();
+                mMediaMuxer.stop();
+                mMediaMuxer.release();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        public void requestExit() {
+            mShouldExit = true;
+        }
     }
 
-    public interface RecordInfoListener {
-        void onTime(long times);
-    }
 }
