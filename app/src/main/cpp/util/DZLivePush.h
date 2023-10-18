@@ -13,6 +13,7 @@ public:
     char *liveUrl = NULL;
     DZPacketQueue *pPacketQueue = NULL;
     RTMP *pRtmp = NULL;
+    bool isPushing = true;
 
 public:
     DZLivePush(const char *liveUrl, DZJNICall *pJniCall);
@@ -23,6 +24,9 @@ public:
      * 初始化连接
      */
     void initConnect();
+
+    void pushSpsPps(jbyte *spsData, jint spsLen, jbyte *ppsData, jint ppsLen);
+
 };
 
 

@@ -56,6 +56,16 @@ void *initConnectFun(void * context){
 
     LOGE("rtmp connect success");
     pLivePush->pJniCall->callConnectSuccess(THREAD_CHILD);
+    // 推流
+    while (pLivePush->isPushing){
+        // 不断往流媒体服务器上去推
+        RTMPPacket *pPacket = pLivePush->pPacketQueue->pop();
+        int res = RTMP_SendPacket(pLivePush->pRtmp, pPacket, 1);
+        LOGE("res = %d", res);
+        RTMPPacket_Free(pPacket);
+        free(pPacket);
+    }
+
     return 0;
 
 }
@@ -64,4 +74,86 @@ void DZLivePush::initConnect() {
     pthread_t initConnectTid;
     pthread_create(&initConnectTid, NULL, initConnectFun, this);
     pthread_detach(initConnectTid);
+}
+/**
+ * 发送 sps 和 pps 到流媒体服务器
+ * @param spsData sps 的数据
+ * @param spsLen sps 的数据长度
+ * @param ppsData pps 的数据
+ * @param ppsLen pps 的数据长度
+ */
+void DZLivePush::pushSpsPps(jbyte *spsData, jint spsLen, jbyte *ppsData, jint ppsLen) {
+    // flv 封装格式
+    // frame type : 1关键帧，2 非关键帧 (4bit)
+    // CodecID : 7表示 AVC (4bit)  , 与 frame type 组合起来刚好是 1 个字节  0x17
+    // fixed : 0x00 0x00 0x00 0x00 (4byte)
+    // configurationVersion  (1byte)  0x01版本
+    // AVCProfileIndication  (1byte)  sps[1] profile
+    // profile_compatibility (1byte)  sps[2] compatibility
+    // AVCLevelIndication    (1byte)  sps[3] Profile level
+    // lengthSizeMinusOne    (1byte)  0xff   包长数据所使用的字节数
+
+    // sps + pps 的数据
+    // sps number            (1byte)  0xe1   sps 个数
+    // sps data length       (2byte)  sps 长度
+    // sps data                       sps 的内容
+    // pps number            (1byte)  0x01   pps 个数
+    // pps data length       (2byte)  pps 长度
+    // pps data                       pps 的内容
+
+    // body 长度 = spsLen + ppsLen + 上面所罗列出来的 16 字节
+    int bodySize = spsLen + ppsLen + 16;
+    // 初始化创建 RTMPPacket
+    RTMPPacket *pPacket = static_cast<RTMPPacket *>(malloc(sizeof(RTMPPacket)));
+    RTMPPacket_Alloc(pPacket, bodySize);
+    RTMPPacket_Reset(pPacket);
+
+    // 按照上面的协议，开始一个一个给 body 赋值
+    char *body = pPacket->m_body;
+    int index = 0;
+
+    // CodecID 与 frame type 组合起来刚好是 1 个字节  0x17
+    body[index++] = 0x17;
+    // fixed : 0x00 0x00 0x00 0x00 (4byte)
+    body[index++] = 0x00;
+    body[index++] = 0x00;
+    body[index++] = 0x00;
+    body[index++] = 0x00;
+    //0x01版本
+    body[index++] = 0x01;
+    // sps[1] profile
+    body[index++] = spsData[1];
+    // sps[2] compatibility
+    body[index++] = spsData[2];
+    // sps[3] Profile level
+    body[index++] = spsData[3];
+    // 0xff   包长数据所使用的字节数
+    body[index++] = 0xff;
+
+    // 0xe1   sps 个数
+    body[index++] = 0xe1;
+    // sps 长度 高八位和低八位
+    body[index++] = (spsLen >> 8) & 0xff;
+    body[index++] = spsLen & 0xff;
+    // sps 的内容
+    memcpy(&body[index], spsData, spsLen);
+    index += spsLen;
+    // 0x01   pps 个数
+    body[index++] = 0x01;
+    // pps 长度 高八位和低八位
+    body[index++] = (ppsLen >> 8) & 0xff;
+    body[index++] = ppsLen & 0xff;
+    // pps 的内容
+    memcpy(&body[index], ppsData, ppsLen);
+
+    // 设置 RTMPPacket 的参数
+    pPacket->m_packetType = RTMP_PACKET_TYPE_VIDEO;
+    pPacket->m_nBodySize = bodySize;
+    pPacket->m_nTimeStamp = 0;
+    pPacket->m_hasAbsTimestamp = 0;
+    pPacket->m_nChannel = 0x04;
+    pPacket->m_headerType = RTMP_PACKET_SIZE_MEDIUM;
+    pPacket->m_nInfoField2 = this->pRtmp->m_stream_id;
+    // 添加到发送队列
+    pPacketQueue->push(pPacket);
 }

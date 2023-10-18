@@ -218,6 +218,11 @@ public abstract class BaseVideoPush {
                             }
                             mBufferInfo.presentationTimeUs -= mVideoPts;
 
+                            // 在关键帧之前先把 sps 和 pps 推到流媒体服务器
+                            if (mBufferInfo.flags == MediaCodec.BUFFER_FLAG_KEY_FRAME){
+                                mVideoRecorderWr.get().mLivePush.pushSpsPps(mVideoSps,mVideoSps.length, mVideoPps, mVideoPps.length);
+                            }
+
                             /*byte[] data = new byte[outBuffer.remaining()];
                             outBuffer.get(data, 0, data.length);
                             Log.e("TAG", bytesToHexString(data));*/

@@ -43,3 +43,16 @@ Java_com_swan_livepush_LivePush_nStop(JNIEnv *env, jobject thiz) {
         pJniCall = NULL;
     }
 }
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_swan_livepush_LivePush_pushSpsPps(JNIEnv *env, jobject thiz, jbyteArray sps_data,
+                                           jint sps_len, jbyteArray pps_data, jint pps_len) {
+    jbyte *spsData = env->GetByteArrayElements(sps_data, NULL);
+    jbyte *ppsData = env->GetByteArrayElements(pps_data, NULL);
+    if (pLivePush != NULL){
+        pLivePush->pushSpsPps(spsData, sps_len, ppsData, pps_len);
+    }
+
+    env->ReleaseByteArrayElements(sps_data, spsData, 0);
+    env->ReleaseByteArrayElements(pps_data, ppsData, 0);
+}

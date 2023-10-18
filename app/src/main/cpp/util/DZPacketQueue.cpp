@@ -46,7 +46,7 @@ void DZPacketQueue::push(RTMPPacket *pPacket) {
 }
 
 RTMPPacket *DZPacketQueue::pop() {
-    RTMPPacket *pPacket;
+    RTMPPacket *pPacket = NULL;
     pthread_mutex_lock(&packetMutex);
     while (pPacketQueue->empty()){
         pthread_cond_wait(&packetCond, &packetMutex);

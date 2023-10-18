@@ -57,4 +57,6 @@ public class LivePush {
             this.mConnectListener.connectSuccess();
         }
     }
+
+    public native void pushSpsPps(byte[] spsData, int spsLen, byte[] ppsData, int ppsLen);
 }
