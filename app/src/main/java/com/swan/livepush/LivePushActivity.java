@@ -1,8 +1,8 @@
 package com.swan.livepush;
 
+import android.Manifest;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -18,7 +18,6 @@ public class LivePushActivity extends AppCompatActivity implements ConnectListen
     private CameraFocusView mFocusView;
     private DefaultVideoPush mVideoPush;
 
-    private LivePush mLivePush;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,16 +25,10 @@ public class LivePushActivity extends AppCompatActivity implements ConnectListen
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        getPermission();
 
-        mLivePush = new LivePush("rtmp://120.24.85.248/myapp/mystream");
-        mLivePush.setOnConnectListener(this);
 
-        binding.liveBt.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startLivePush();
-            }
-        });
+        binding.liveBt.setOnClickListener(v -> startLivePush());
         mCameraView = binding.cameraView;
         mFocusView = binding.cameraFocusView;
         mCameraView.setOnFocusListener(new CameraView.FocusListener() {
@@ -54,15 +47,19 @@ public class LivePushActivity extends AppCompatActivity implements ConnectListen
     }
 
     private void startLivePush() {
-        mLivePush.initConnect();
         Log.e("TAG","开始推流");
-
+        mVideoPush = new DefaultVideoPush(LivePushActivity.this,
+            mCameraView.getEglContext(), mCameraView.getTextureId());
+        mVideoPush.initVideo("rtmp://120.24.85.248/myapp/mystream",LivePushActivity.this,Utils.getScreenWidth(LivePushActivity.this),
+            Utils.getScreenHeight(LivePushActivity.this));
+        mVideoPush.setOnConnectListener(this);
+        mVideoPush.startPush();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        mLivePush.stop();
+        mVideoPush.stopPush();
     }
 
     @Override
@@ -73,10 +70,10 @@ public class LivePushActivity extends AppCompatActivity implements ConnectListen
     @Override
     public void connectSuccess() {
         Log.e("TAG", "connectSuccess: 可以推流了");
-        mVideoPush = new DefaultVideoPush(LivePushActivity.this,
-            mCameraView.getEglContext(), mCameraView.getTextureId());
-        mVideoPush.initVideo(Utils.getScreenWidth(LivePushActivity.this),
-            Utils.getScreenHeight(LivePushActivity.this));
-        mVideoPush.startPush();
+
+    }
+
+    private void getPermission() {
+        requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 1);
     }
 }

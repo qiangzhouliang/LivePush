@@ -20,12 +20,12 @@ public class LivePush {
     private static Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
     private String mLiveUrl;
     private ConnectListener mConnectListener;
-    public LivePush(String liveUrl){
-        this.mLiveUrl = liveUrl;
-    }
-
     public void setOnConnectListener(ConnectListener mConnectListener) {
         this.mConnectListener = mConnectListener;
+    }
+
+    public LivePush(String liveUrl){
+        this.mLiveUrl = liveUrl;
     }
 
     public void initConnect(){
