@@ -401,8 +401,10 @@ public abstract class BaseVideoPush {
 
         private void onDestroy() {
             try {
-                mAudioCodec.stop();
-                mAudioCodec.release();
+                if (mAudioCodec != null) {
+                    mAudioCodec.stop();
+                    mAudioCodec.release();
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }

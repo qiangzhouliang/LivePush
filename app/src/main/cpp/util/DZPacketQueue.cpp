@@ -48,12 +48,21 @@ void DZPacketQueue::push(RTMPPacket *pPacket) {
 RTMPPacket *DZPacketQueue::pop() {
     RTMPPacket *pPacket = NULL;
     pthread_mutex_lock(&packetMutex);
-    while (pPacketQueue->empty()){
+    // 有可能有一直在这儿等，没法退出的情况
+    if (pPacketQueue->empty()){
         pthread_cond_wait(&packetCond, &packetMutex);
+    } else {
+        pPacket = pPacketQueue->front();
+        pPacketQueue->pop();
     }
-    pPacket = pPacketQueue->front();
-    pPacketQueue->pop();
-
     pthread_mutex_unlock(&packetMutex);
+
     return pPacket;
+}
+
+void DZPacketQueue::notify() {
+    pthread_mutex_lock(&packetMutex);
+    // 通知消费者消费
+    pthread_cond_signal(&packetCond);
+    pthread_mutex_unlock(&packetMutex);
 }

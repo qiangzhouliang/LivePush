@@ -34,6 +34,7 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_swan_livepush_LivePush_nStop(JNIEnv *env, jobject thiz) {
     if (pLivePush != NULL){
+        pLivePush->stop();
         delete(pLivePush);
         pLivePush = NULL;
     }

@@ -61,20 +61,23 @@ void *initConnectFun(void * context){
     while (pLivePush->isPushing){
         // 不断往流媒体服务器上去推
         RTMPPacket *pPacket = pLivePush->pPacketQueue->pop();
-        int res = RTMP_SendPacket(pLivePush->pRtmp, pPacket, 1);
-        LOGE("res = %d", res);
-        RTMPPacket_Free(pPacket);
-        free(pPacket);
+        if (pPacket != NULL){
+            int res = RTMP_SendPacket(pLivePush->pRtmp, pPacket, 1);
+            LOGE("res = %d", res);
+            RTMPPacket_Free(pPacket);
+            free(pPacket);
+        }
     }
+
+    LOGE("停止了");
 
     return 0;
 
 }
 void DZLivePush::initConnect() {
     // 怎么连接
-    pthread_t initConnectTid;
     pthread_create(&initConnectTid, NULL, initConnectFun, this);
-    pthread_detach(initConnectTid);
+//    pthread_detach(initConnectTid);
 }
 /**
  * 发送 sps 和 pps 到流媒体服务器
@@ -253,4 +256,12 @@ void DZLivePush::pushAudio(jbyte *audioData, jint dataLen) {
     pPacket->m_headerType = RTMP_PACKET_SIZE_LARGE;
     pPacket->m_nInfoField2 = this->pRtmp->m_stream_id;
     pPacketQueue->push(pPacket);
+}
+
+void DZLivePush::stop() {
+    isPushing = false;
+    pPacketQueue->notify();
+    //“pthread_join用来等待一个线程的结束,线程间同步的操作
+    pthread_join(initConnectTid, NULL);
+    LOGE("等待停止了");
 }

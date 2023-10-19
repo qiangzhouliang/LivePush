@@ -15,6 +15,7 @@ public:
     RTMP *pRtmp = NULL;
     bool isPushing = true;
     uint32_t startTime;
+    pthread_t initConnectTid;
 
 public:
     DZLivePush(const char *liveUrl, DZJNICall *pJniCall);
@@ -31,6 +32,8 @@ public:
     void pushVideo(jbyte *videoData, jint dataLen, jboolean keyFrame);
 
     void pushAudio(jbyte *audioData, jint dataLen);
+
+    void stop();
 };
 
 

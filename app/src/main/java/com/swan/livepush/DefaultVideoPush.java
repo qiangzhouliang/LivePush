@@ -2,8 +2,6 @@ package com.swan.livepush;
 
 import android.content.Context;
 
-import com.swan.record.RecorderRenderer;
-
 import javax.microedition.khronos.egl.EGLContext;
 
 /**
@@ -13,6 +11,6 @@ import javax.microedition.khronos.egl.EGLContext;
 public class DefaultVideoPush extends BaseVideoPush {
     public DefaultVideoPush(Context context, EGLContext eglContext, int textureId) {
         super(context, eglContext);
-        setRenderer(new RecorderRenderer(context, textureId));
+        setRenderer(new PushRenderer(context, textureId));
     }
 }

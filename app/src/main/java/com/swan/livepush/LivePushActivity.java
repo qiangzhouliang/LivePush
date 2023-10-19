@@ -16,6 +16,7 @@ public class LivePushActivity extends AppCompatActivity implements ConnectListen
     private CameraView mCameraView;
     private CameraFocusView mFocusView;
     private DefaultVideoPush mVideoPush;
+    private boolean isBegingPush = false;
 
 
     @Override
@@ -26,8 +27,16 @@ public class LivePushActivity extends AppCompatActivity implements ConnectListen
         setContentView(binding.getRoot());
         getPermission();
 
-
-        binding.liveBt.setOnClickListener(v -> startLivePush());
+        binding.liveBt.setOnClickListener(v -> {
+            if (isBegingPush){
+                mVideoPush.stopPush();
+                isBegingPush = false;
+                binding.liveBt.setText("开始推流");
+            } else {
+                binding.liveBt.setText("结束推流");
+                startLivePush();
+            }
+        });
         mCameraView = binding.cameraView;
         mFocusView = binding.cameraFocusView;
         mCameraView.setOnFocusListener(new CameraView.FocusListener() {
@@ -61,19 +70,22 @@ public class LivePushActivity extends AppCompatActivity implements ConnectListen
 
     @Override
     protected void onDestroy() {
+        if (mVideoPush != null) {
+            mVideoPush.stopPush();
+        }
         super.onDestroy();
-        mVideoPush.stopPush();
     }
 
     @Override
     public void connectError(int errCode, String errMsg) {
         Log.e("TAG", "connectError: "+errMsg);
+        isBegingPush = false;
     }
 
     @Override
     public void connectSuccess() {
         Log.e("TAG", "connectSuccess: 可以推流了");
-
+        isBegingPush = true;
     }
 
     private void getPermission() {
