@@ -29,6 +29,8 @@ public:
     void pushSpsPps(jbyte *spsData, jint spsLen, jbyte *ppsData, jint ppsLen);
 
     void pushVideo(jbyte *videoData, jint dataLen, jboolean keyFrame);
+
+    void pushAudio(jbyte *audioData, jint dataLen);
 };
 
 

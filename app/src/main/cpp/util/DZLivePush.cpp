@@ -213,3 +213,44 @@ void DZLivePush::pushVideo(jbyte *videoData, jint dataLen, jboolean keyFrame) {
     pPacket->m_nInfoField2 = this->pRtmp->m_stream_id;
     pPacketQueue->push(pPacket);
 }
+/**
+* 发送音频数据到服务器
+* @param audioData
+* @param dataLen
+*/
+void DZLivePush::pushAudio(jbyte *audioData, jint dataLen) {
+    // 2 字节头信息
+    // 前四位表示音频数据格式 AAC  10(A)
+    // 五六位表示采样率 0 = 5.5k  1 = 11k  2 = 22k  3(11) = 44k
+    // 七位表示采样采样的精度 0 = 8bits  1 = 16bits
+    // 八位表示音频类型  0 = mono  1 = stereo
+    // 我们这里算出来第一个字节是 0xAF
+    // 0x01 代表 aac 原始数据
+
+    // body 长度 = dataLen + 上面所罗列出来的 2 字节
+    int bodySize = dataLen + 2;
+    // 初始化创建 RTMPPacket
+    RTMPPacket *pPacket = static_cast<RTMPPacket *>(malloc(sizeof(RTMPPacket)));
+    RTMPPacket_Alloc(pPacket, bodySize);
+    RTMPPacket_Reset(pPacket);
+
+    // 按照上面的协议，开始一个一个给 body 赋值
+    char *body = pPacket->m_body;
+    int index = 0;
+    // 我们这里算出来第一个字节是 0xAF
+    body[index++] = 0xAF;
+    // 代表 AAC 原始数据
+    body[index++] = 0x01;
+    // audio data
+    memcpy(&body[index], audioData, dataLen);
+
+    // 设置 RTMPPacket 的参数
+    pPacket->m_packetType = RTMP_PACKET_TYPE_AUDIO;
+    pPacket->m_nBodySize = bodySize;
+    pPacket->m_nTimeStamp = RTMP_GetTime() - startTime;
+    pPacket->m_hasAbsTimestamp = 0;
+    pPacket->m_nChannel = 0x04;
+    pPacket->m_headerType = RTMP_PACKET_SIZE_LARGE;
+    pPacket->m_nInfoField2 = this->pRtmp->m_stream_id;
+    pPacketQueue->push(pPacket);
+}

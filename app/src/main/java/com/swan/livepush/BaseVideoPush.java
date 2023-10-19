@@ -308,9 +308,10 @@ public abstract class BaseVideoPush {
                         mBufferInfo.presentationTimeUs -= mAudioPts;
 
                         // 打印一下音频的 aac 数据
-                        /*byte[] data = new byte[outBuffer.remaining()];
+                        byte[] data = new byte[outBuffer.remaining()];
                         outBuffer.get(data, 0, data.length);
-                        Log.e("TAG", bytesToHexString(data));*/
+                        //Log.e("TAG", bytesToHexString(data));
+                        mVideoRecorderWr.get().mLivePush.pushAudio(data, data.length);
 
                         mAudioCodec.releaseOutputBuffer(outputBufferIndex, false);
                         outputBufferIndex = mAudioCodec.dequeueOutputBuffer(mBufferInfo, 0);
@@ -344,7 +345,6 @@ public abstract class BaseVideoPush {
         private final int mMinBufferSize;
         private volatile boolean mShouldExit = false;
         private MediaCodec mAudioCodec;
-        private MediaCodec.BufferInfo mBufferInfo;
         private long mAudioPts = 0;
         private AudioRecord mAudioRecord;
         // pcm 数据
@@ -352,7 +352,6 @@ public abstract class BaseVideoPush {
 
         public AudioRecordThread(WeakReference<BaseVideoPush> videoRecorderWr) {
             mAudioCodec = videoRecorderWr.get().mAudioCodec;
-            mBufferInfo = new MediaCodec.BufferInfo();
 
             mMinBufferSize = AudioRecord.getMinBufferSize(BaseVideoPush.AUDIO_SAMPLE_RATE, AudioFormat.CHANNEL_IN_STEREO,
                 AudioFormat.ENCODING_PCM_16BIT);

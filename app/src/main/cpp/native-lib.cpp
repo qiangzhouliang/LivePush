@@ -67,3 +67,14 @@ Java_com_swan_livepush_LivePush_pushVideo(JNIEnv *env, jobject thiz, jbyteArray 
 
     env->ReleaseByteArrayElements(video_data, videoData, 0);
 }
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_swan_livepush_LivePush_pushAudio(JNIEnv *env, jobject thiz, jbyteArray audio_data,
+                                          jint data_len) {
+    jbyte *audioData = env->GetByteArrayElements(audio_data, NULL);
+    if (pLivePush != NULL){
+        pLivePush->pushAudio(audioData, data_len);
+    }
+
+    env->ReleaseByteArrayElements(audio_data, audioData, 0);
+}
